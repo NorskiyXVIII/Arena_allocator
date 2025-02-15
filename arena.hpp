@@ -1,100 +1,129 @@
 #pragma once
-#include <iostream>
 #include <cstdlib>
-#include <stdexcept>
-#include <cstring>
+#include <iostream>
+namespace arena {
+    class allocator;
+    void print_arena_bytes(const allocator& arena);
 
-class arena_allocator;
-void print_mem_of_allocator(arena_allocator& arena);
-void log_allocator(arena_allocator& arena);
 
-class arena_allocator {
-private:
-    char* memory_ptr;
-    size_t capacity; // max size
-    size_t offset; // current pointer in arena
+    class allocator {
+    private:
+        char* memory = nullptr;
+        size_t cap = 0, offset = 0;
+    public:
+        allocator(void* mem, size_t cap, size_t offset = 0) : cap{cap}, offset{offset} {
+            if (mem == nullptr || mem == 0) {
+                throw "mem = nullptr not allowed";
+            }
 
-public:
-    explicit arena_allocator(size_t size) : capacity{size}, offset{0} {
-        memory_ptr = static_cast<char*>(std::malloc(capacity));
-        if (!memory_ptr) throw std::bad_alloc();
-    }
+            this->memory = (char*)mem;
+        }
+        allocator(allocator& alloc) {
+            this->memory = alloc.memory;
+            this->cap    = alloc.cap;
+            this->offset = alloc.offset;
 
-    ~arena_allocator() {
-        if (memory_ptr == nullptr) return;
-        std::free(memory_ptr);
-    }
+            alloc.memory = nullptr;
+            alloc.cap    = 0;
+            alloc.offset = 0;
+        }
+        allocator(size_t cap) : cap{cap} {
+            memory = static_cast<char*>(std::malloc(cap));
+            if (memory == 0) {
+                throw "allocate error";
+            }
+        }
+        allocator() {}
 
-    void deinit() {
-        if (memory_ptr == nullptr) return; 
+        void init(size_t cap) {
+            this->cap = cap;
+
+            memory = static_cast<char*>(std::malloc(cap));
+            if (memory == 0) {
+                throw "allocate error";
+            }
+        }
+        void init(allocator& alloc) {
+            this->memory = alloc.memory;
+            this->cap    = alloc.cap;
+            this->offset = alloc.offset;
+
+            alloc.memory = nullptr;
+            alloc.cap    = 0;
+            alloc.offset = 0;
+        }
+        void init(void* mem, size_t cap, size_t offset = 0) {
+            this->cap    = cap;
+            this->offset = 0;
+
+            if (mem == nullptr || mem == 0) {
+                throw "mem = nullptr not allowed";
+            }
+
+            this->memory = (char*)mem;
+        }
+
+        void* alloc(size_t sz) {
+            if (offset + sz > cap) {
+                throw "bad alloc in arena";
+            }
+
+            void* pt = memory + offset;
+            offset += sz;
+
+            return pt;
+        }
+
+        void free() {
+            offset = 0;
+        }
+
+        void free_arena() {
+            offset = 0;
+            cap = 0;
+            std::free(memory);
+            memory = nullptr;
+        }
+
+        size_t get_size() const {
+            return offset;
+        }
+        size_t get_capacity() const {
+            return cap;
+        }
+        char* get_ptr() const {
+            return memory;
+        }
+
+        void resize_arena(size_t capacity) {
+            free_arena();
+            init(capacity);
+        }
+
+        ~allocator() {
+            if (memory == nullptr) return;
+            std::free(memory);
+            memory = nullptr;
+        }
+    
+    };
+
+    void print_arena_bytes(const allocator& arena) {
+
+        if (arena.get_size() <= 15) std::printf("{");
+        else                        std::printf("{\n");
+
+        for (int i = 0; i < arena.get_size(); i++) {
+            if (i == 0) std::printf("\t");
+            else if (i % 20 == 0) std::printf("\n\t");
+
+            std::printf("%d", (char)arena.get_ptr()[i]);
+            if (i < arena.get_size() - 1 ) std::printf(", ");
+        }
         
-        std::free(memory_ptr);
-        memory_ptr = nullptr;
+        if (arena.get_size() >= 15) std::printf("\n");
+        std::printf("}\n");
     }
 
-    void init(size_t bytes) {
-        if (memory_ptr != nullptr) return;
 
-        memory_ptr = static_cast<char*>(std::malloc(bytes));
-        capacity = bytes;
-        offset = 0;
-
-        if (!memory_ptr) throw std::bad_alloc();
-        
-    }
-
-    void init(size_t bytes, size_t cap) {
-        if (memory_ptr != nullptr) return;
-
-        memory_ptr = static_cast<char*>(std::malloc(bytes));
-        capacity = cap;
-        offset = 0;
-
-        if (!memory_ptr) throw std::bad_alloc();
-        
-    }
-
-    void free() {
-        offset = 0;
-    }
-
-    void* alloc(size_t size) {
-        if (offset + size > capacity) throw std::bad_alloc();
-
-        void* ptr = memory_ptr + offset;
-        offset += size;
-
-        return ptr;
-    }
-
-    size_t used_size() {
-        return offset;
-    }
-    size_t cap() {
-        return capacity;
-    }
-
-    static void memset(arena_allocator& self, char z) {
-        for (size_t i = 0; i < self.cap(); i++) self.memory_ptr[i] = z;
-    }
-
-    friend void print_mem_of_allocator(arena_allocator&);
-    friend void log_allocator(arena_allocator&);
-};
-
-
-void print_mem_of_allocator(arena_allocator& arena) {
-    std::cout << "mem { " << std::endl;
-    for (size_t i = 0; i < arena.used_size(); i++) {
-        std::cout << "\t" << static_cast<int>(arena.memory_ptr[i]) << ", ";
-    }
-    std::cout << std::endl << "}" << std::endl;
-
-}
-
-void log_allocator(arena_allocator& arena) {
-    std::cout << "capacity: " << arena.cap() << std::endl;
-    std::cout << "offset: " << arena.used_size() << std::endl;
-
-    print_mem_of_allocator(arena);
 }
