@@ -114,14 +114,16 @@ namespace arena {
         else                        std::printf("{\n");
 
         for (int i = 0; i < arena.get_size(); i++) {
-            if (i == 0) std::printf("\t");
-            else if (i % 20 == 0) std::printf("\n\t");
+            if (i == 0 && arena.get_size() >= 15) std::printf("\t");
+            else if (i % 20 == 0 && i != 0) std::printf("\n\t");
+            else if (i == 0) std::printf(" "); 
 
             std::printf("%d", (char)arena.get_ptr()[i]);
             if (i < arena.get_size() - 1 ) std::printf(", ");
         }
         
         if (arena.get_size() >= 15) std::printf("\n");
+        else if(arena.get_size() < 15) std::printf(" ");
         std::printf("}\n");
     }
 
